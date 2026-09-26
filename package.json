@@ -1,0 +1,20 @@
+{
+  "name": "lafd-management",
+  "version": "1.0.0",
+  "description": "LAFD Management - Discord bot for the Los Santos Fire Department ER:LC roleplay department",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5"
+  },
+  "license": "MIT"
+}
