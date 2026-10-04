@@ -15,7 +15,9 @@ const config = require('./config');
 config.validateCoreConfig();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  // GuildMembers is privileged - enable "Server Members Intent" in the Developer Portal (Bot tab).
+  // Needed for /setup-permissions to fetch every member and for automatic tier role syncing.
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
   partials: [Partials.GuildMember, Partials.User],
 });
 

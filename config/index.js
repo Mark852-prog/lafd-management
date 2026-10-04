@@ -13,6 +13,7 @@ const { FIRE_RANKS, EMS_RANKS, ALL_RANKS, SPECIAL_ROLES, getRankByRoleId, getRan
 const { CHANNELS, LOG_CHANNELS } = require('./channels.config');
 const { PERMISSION_LEVELS, REQUIRED_LEVEL } = require('./permissions.config');
 const { LOGO_URL, COLORS, ICONS, FOOTER_TEXT } = require('./branding.config');
+const { FIRE_TIERS, EMS_TIERS, RANK_TIERS, STANDALONE_TIERS } = require('./tiers.config');
 
 const REQUIRED_CORE_VARS = ['DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID'];
 
@@ -53,5 +54,9 @@ module.exports = {
   COLORS,
   ICONS,
   FOOTER_TEXT,
+  FIRE_TIERS,
+  EMS_TIERS,
+  RANK_TIERS,
+  STANDALONE_TIERS,
   validateCoreConfig,
 };

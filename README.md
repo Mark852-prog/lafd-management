@@ -2,7 +2,7 @@
 
 A Discord management bot built specifically for a **Los Santos Fire Department (LAFD)** ER:LC roleplay department, using **discord.js v14**.
 
-The bot manages promotions, demotions, disciplinary records, callsigns, shifts, rosters, and announcements — all using your server's **existing** roles and channels. It never creates roles or channels.
+The bot manages promotions, demotions, disciplinary records, callsigns, shifts, rosters, and announcements — all using your server's **existing** rank roles and channels. It never creates channels or rank roles. The only roles it creates are the permission tier roles made by `/setup-permissions` (see section 9.1).
 
 ---
 
@@ -19,6 +19,7 @@ The bot manages promotions, demotions, disciplinary records, callsigns, shifts, 
 | Promote a member | `/promote` |
 | Demote a member | `/demote` |
 | Post an announcement | `/announce` |
+| Create permission tier roles and sync them to members | `/setup-permissions` |
 | View the roster | `/roster` |
 | View a member's profile | `/member` |
 | Start/end a shift | `/shift start`, `/shift end` |
@@ -36,15 +37,17 @@ lafd-management/
 ├── commands/
 │   ├── callsign/         → /request callsign
 │   ├── discipline/       → /warn, /infract, /infractions, /clear-infraction
-│   ├── management/       → /promote, /demote, /announce
+│   ├── management/       → /promote, /demote, /announce, /setup-permissions
 │   ├── roster/           → /roster, /member
 │   ├── shifts/           → /shift, /on-duty
 │   └── general/          → /ping
 ├── events/
 │   ├── ready.js            Logs in and confirms the bot is online
-│   └── interactionCreate.js Routes slash commands, autocomplete, and callsign buttons
+│   ├── interactionCreate.js Routes slash commands, autocomplete, and callsign buttons
+│   └── guildMemberUpdate.js Keeps permission tier roles in sync with rank roles
 ├── utils/
 │   ├── permissions.js     Centralized rank → permission level logic
+│   ├── tiers.js           Permission tier role creation + member syncing
 │   ├── embeds.js          Every embed builder (promotion, infraction, callsign, etc.)
 │   ├── logger.js          Sends log embeds to your configured logging channels
 │   ├── confirmation.js    Reusable Confirm/Cancel button flow
@@ -55,6 +58,7 @@ lafd-management/
 │   ├── roles.config.js     Fire & EMS rank ladders, mapped to your role IDs
 │   ├── channels.config.js  Callsign/announcement/logging channel IDs
 │   ├── permissions.config.js  Permission levels required per command
+│   ├── tiers.config.js     Discord permission tier roles + which ranks get them
 │   ├── branding.config.js  Colors, icons, footer text, logo URL
 │   └── index.js            Barrel file + startup validation
 ├── deploy-commands.js     Registers slash commands with Discord
@@ -137,7 +141,11 @@ The bot's **avatar** itself is set separately in the Discord Developer Portal (B
 
 In the Developer Portal, go to **OAuth2 → URL Generator**:
 - Scopes: `bot`, `applications.commands`
-- Bot Permissions: `Send Messages`, `Embed Links`, `Manage Roles`, `Read Message History`, `Use Slash Commands`
+- Bot Permissions: `Manage Roles`, `View Channels`, `Send Messages`, `Send Messages in Threads`, `Embed Links`, `Attach Files`, `Add Reactions`, `Use External Emojis`, `Use External Stickers`, `Read Message History`, `Manage Messages`, `Manage Threads`, `Create Public Threads`, `Create Private Threads`, `Manage Nicknames`, `Mention @everyone, @here, and All Roles`, `Use Slash Commands`
+
+  (Discord only lets a bot grant permissions it has itself, so `/setup-permissions` needs every permission used by the tier roles.)
+
+Then in **Bot → Privileged Gateway Intents**, turn on **Server Members Intent**. The bot will fail to log in without it.
 
 Open the generated URL and invite the bot to your **existing** LAFD server.
 
@@ -165,7 +173,7 @@ npm start
 
 You should see:
 ```
-[LAFD Management] Loaded 13 command(s).
+[LAFD Management] Loaded 14 command(s).
 [LAFD Management] Logged in as YourBot#0000
 ```
 
@@ -184,6 +192,37 @@ Permissions are based entirely on the **existing rank role** a member holds — 
 | 0 — Member | Everyone else | View roster, own profile, own shifts |
 
 Levels are **cumulative** — a level 3 staffer can do everything a level 1 staffer can.
+
+### 9.1 Discord permission tiers (`/setup-permissions`)
+
+Bot command access (above) is separate from the **Discord server permissions** members get. Those come from permission tier roles defined in `config/tiers.config.js`. A Department Head runs `/setup-permissions` once, and it:
+
+1. Creates any tier role that doesn't exist yet (matched by name, case-insensitive) and sets each tier role's permissions to **exactly** the department policy.
+2. Gives every member the tier role for their rank and removes tier roles that don't match.
+
+After that, tier roles update automatically whenever someone's rank role changes (`/promote`, `/demote`, or a manual role edit). It's safe to re-run `/setup-permissions` any time, e.g. after editing `tiers.config.js`.
+
+| Tier role | Ranks |
+|---|---|
+| FIRE — DEPARTMENT COMMAND | Fire Chief, Deputy Fire Chief, Assistant Fire Chief |
+| FIRE — COMMAND STAFF | High Rank, Battalion Chief |
+| FIRE — SUPERVISORY | Captain, Lieutenant |
+| FIRE — SENIOR PERSONNEL | Junior Engineer, Senior Engineer, Engineer |
+| FIRE — FIRE PERSONNEL | Firefighter III, Firefighter II, Firefighter I |
+| FIRE — LOW RANK | Probationary Firefighter |
+| EMS — EXECUTIVE COMMAND | Medical Director, Deputy Medical Director, Assistant Medical Director |
+| EMS — COMMAND STAFF | EMS Senior High Rank, EMS High Rank, Division Medical Officer |
+| EMS — SUPERVISORY | Paramedic Captain, Paramedic Lieutenant, EMS Supervisory, Senior/Supervisory/Junior Supervisory Medic |
+| EMS — SENIOR PERSONNEL | Paramedic in Charge |
+| EMS — PARAMEDIC PERSONNEL | Paramedic, Junior Paramedic |
+| EMS — EMT PERSONNEL | EMT |
+| EMS — LOW RANK | Probationary EMT |
+| VERIFIED | Permissions set only; never assigned or removed by the bot |
+
+Notes:
+- New tier roles are created at the bottom of the role list, so your rank roles' colors still show. The bot's role must be **above** the tier roles.
+- `@everyone`, rank roles, and channel permission overwrites are never changed. If `@everyone` already grants a permission, members keep it regardless of tier.
+- Tier roles are managed by the bot: a tier role given by hand to someone without the matching rank is removed the next time their rank changes or `/setup-permissions` runs.
 
 ---
 
