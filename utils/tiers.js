@@ -7,8 +7,8 @@
  * -----------------------------------------------------------------------
  */
 
-const { PermissionsBitField, PermissionFlagsBits } = require('discord.js');
-const { ALL_RANKS, RANK_TIERS, STANDALONE_TIERS } = require('../config');
+const { PermissionsBitField, PermissionFlagsBits, ChannelType } = require('discord.js');
+const { ALL_RANKS, RANK_TIERS, STANDALONE_TIERS, CHANNEL_PERMISSIONS } = require('../config');
 
 const ALL_TIERS = [...RANK_TIERS, ...STANDALONE_TIERS];
 
@@ -95,4 +95,77 @@ async function syncMemberTiers(member, reason = 'LAFD tier sync') {
   return { added: toAdd.map((r) => r.name), removed: toRemove.map((r) => r.name) };
 }
 
-module.exports = { ALL_TIERS, findTierRole, getTierForRank, getMissingBotPermissions, ensureTierRoles, syncMemberTiers };
+/**
+ * Finds the channels a CHANNEL_PERMISSIONS entry applies to: the configured
+ * channel/category, else a category whose name contains `match` (plus its
+ * children), else every channel whose name contains `match`.
+ */
+function resolveConfiguredChannels(guild, entry) {
+  const withChildren = (ch) =>
+    ch.type === ChannelType.GuildCategory ? [ch, ...guild.channels.cache.filter((c) => c.parentId === ch.id).values()] : [ch];
+
+  if (entry.channelId) {
+    const ch = guild.channels.cache.get(entry.channelId);
+    return ch ? withChildren(ch) : [];
+  }
+  const named = guild.channels.cache.filter((c) => !c.isThread() && c.name.toLowerCase().includes(entry.match));
+  const category = named.find((c) => c.type === ChannelType.GuildCategory);
+  return category ? withChildren(category) : [...named.values()];
+}
+
+// Every channel-level permission any tier uses. Channel overwrites deny whatever isn't allowed.
+// (Manage Nicknames is server-only and can't be set per channel.)
+const CHANNEL_PERMISSION_UNIVERSE = new PermissionsBitField([
+  ...ALL_TIERS.flatMap((t) => t.permissions),
+  ...CHANNEL_PERMISSIONS.flatMap((c) => Object.values(c.tiers).flat()),
+]).remove(PermissionFlagsBits.ManageNicknames);
+
+/**
+ * Applies config/channel-permissions.config.js. Returns one result per
+ * entry: { label, channels: [names], failures: [messages] }.
+ */
+async function applyChannelPermissions(guild, reason) {
+  const results = [];
+  for (const entry of CHANNEL_PERMISSIONS) {
+    const channels = resolveConfiguredChannels(guild, entry);
+    const failures = [];
+    if (channels.length === 0) {
+      failures.push(`no channel found (set ${entry.envKey} in .env, or name a channel/category "${entry.match}")`);
+    }
+
+    for (const channel of channels) {
+      try {
+        // Keep the bot able to see the channel before hiding it from @everyone.
+        await channel.permissionOverwrites.edit(guild.members.me, { ViewChannel: true }, { reason });
+        for (const [tierName, allowed] of Object.entries(entry.tiers)) {
+          const role = findTierRole(guild, { name: tierName });
+          if (!role) {
+            failures.push(`${channel.name}: tier role "${tierName}" not found`);
+            continue;
+          }
+          const allow = new PermissionsBitField(allowed);
+          const options = {};
+          for (const name of CHANNEL_PERMISSION_UNIVERSE.toArray()) options[name] = allow.has(PermissionFlagsBits[name]);
+          await channel.permissionOverwrites.create(role, options, { reason });
+        }
+        if (entry.everyone === 'hidden') {
+          await channel.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: false }, { reason });
+        }
+      } catch (err) {
+        failures.push(`${channel.name}: ${err.message}`);
+      }
+    }
+    results.push({ label: entry.label, channels: channels.map((c) => c.name), failures });
+  }
+  return results;
+}
+
+module.exports = {
+  ALL_TIERS,
+  findTierRole,
+  getTierForRank,
+  getMissingBotPermissions,
+  ensureTierRoles,
+  syncMemberTiers,
+  applyChannelPermissions,
+};

@@ -219,9 +219,18 @@ After that, tier roles update automatically whenever someone's rank role changes
 | EMS — LOW RANK | Probationary EMT |
 | VERIFIED | Permissions set only; never assigned or removed by the bot |
 
+**Per-channel access.** `/setup-permissions` also applies channel overrides from `config/channel-permissions.config.js`. Right now that's **Training**: it finds the category with "training" in its name (and every channel in it), or the channels with "training" in the name if there's no such category. You can pin it to a specific channel or category with `CHANNEL_TRAINING` in `.env`. In those channels:
+
+| Tiers | Training access |
+|---|---|
+| Fire Department Command / Command Staff, EMS Executive Command / Command Staff | View, send, threads, embeds, files, reactions, history, manage messages & threads |
+| Fire/EMS Supervisory | Same, minus manage messages & manage threads |
+| All other Fire/EMS tiers | View, read history, add reactions only |
+| VERIFIED / @everyone | No access |
+
 Notes:
 - New tier roles are created at the bottom of the role list, so your rank roles' colors still show. The bot's role must be **above** the tier roles.
-- `@everyone`, rank roles, and channel permission overwrites are never changed. If `@everyone` already grants a permission, members keep it regardless of tier.
+- Rank roles and server-wide `@everyone` permissions are never changed. Channel overrides are only changed on the channels listed in `channel-permissions.config.js`. If `@everyone` already grants a permission, members keep it regardless of tier.
 - Tier roles are managed by the bot: a tier role given by hand to someone without the matching rank is removed the next time their rank changes or `/setup-permissions` runs.
 
 ---

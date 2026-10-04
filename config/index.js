@@ -14,6 +14,7 @@ const { CHANNELS, LOG_CHANNELS } = require('./channels.config');
 const { PERMISSION_LEVELS, REQUIRED_LEVEL } = require('./permissions.config');
 const { LOGO_URL, COLORS, ICONS, FOOTER_TEXT } = require('./branding.config');
 const { FIRE_TIERS, EMS_TIERS, RANK_TIERS, STANDALONE_TIERS } = require('./tiers.config');
+const { CHANNEL_PERMISSIONS } = require('./channel-permissions.config');
 
 const REQUIRED_CORE_VARS = ['DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID'];
 
@@ -58,5 +59,6 @@ module.exports = {
   EMS_TIERS,
   RANK_TIERS,
   STANDALONE_TIERS,
+  CHANNEL_PERMISSIONS,
   validateCoreConfig,
 };

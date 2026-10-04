@@ -6,22 +6,25 @@
  *   1. Creates any missing tier role (FIRE — COMMAND STAFF, EMS — LOW RANK,
  *      VERIFIED, etc.) and sets every tier role's permissions to EXACTLY
  *      the configured list.
- *   2. Gives every member the tier role matching their rank and removes
+ *   2. Applies per-channel tier access (config/channel-permissions.config.js),
+ *      e.g. the Training channel/category.
+ *   3. Gives every member the tier role matching their rank and removes
  *      tier roles they shouldn't have.
  *
  * Safe to re-run any time (e.g. after editing tiers.config.js). After the
  * first run, events/guildMemberUpdate.js keeps tiers in sync automatically.
- * Never touches rank roles, @everyone, or channel overwrites.
+ * Never touches rank roles or server-wide @everyone permissions, and only
+ * changes overwrites on the channels listed in channel-permissions.config.js.
  * -----------------------------------------------------------------------
  */
 
 const { SlashCommandBuilder } = require('discord.js');
-const { REQUIRED_LEVEL, ALL_RANKS, RANK_TIERS, STANDALONE_TIERS, COLORS } = require('../../config');
+const { REQUIRED_LEVEL, ALL_RANKS, RANK_TIERS, STANDALONE_TIERS, CHANNEL_PERMISSIONS, COLORS } = require('../../config');
 const { hasPermission } = require('../../utils/permissions');
-const { replyNoPermission, replyError } = require('../../utils/replies');
+const { replyError } = require('../../utils/replies');
 const { successEmbed } = require('../../utils/embeds');
 const { requestConfirmation } = require('../../utils/confirmation');
-const { getMissingBotPermissions, ensureTierRoles, syncMemberTiers } = require('../../utils/tiers');
+const { getMissingBotPermissions, ensureTierRoles, syncMemberTiers, applyChannelPermissions } = require('../../utils/tiers');
 const { logManagement } = require('../../utils/logger');
 
 const AUDIT_REASON = 'LAFD Management /setup-permissions';
@@ -42,8 +45,11 @@ module.exports = {
     .setDescription('Create/update permission tier roles and sync them to every member. (Department Head only)'),
 
   async execute(interaction) {
+    // Acknowledge right away so Discord never shows "The application did not respond".
+    await interaction.deferReply({ ephemeral: true });
+
     if (!hasPermission(interaction.member, REQUIRED_LEVEL.SETUP_PERMISSIONS)) {
-      return replyNoPermission(interaction);
+      return replyError(interaction, 'You do not have the required LAFD rank/permissions to use this command. (Fire Chief or Medical Director only.)');
     }
 
     const missing = getMissingBotPermissions(interaction.guild);
@@ -51,11 +57,10 @@ module.exports = {
       return replyError(
         interaction,
         'The bot is missing permissions it needs to grant to the tier roles (Discord only lets a bot give out permissions it has):\n' +
-          missing.map((p) => `• ${p}`).join('\n')
+          missing.map((p) => `• ${p}`).join('\n') +
+          '\n\nEasiest fix: Server Settings → Roles → the bot\'s role → turn on **Administrator**.'
       );
     }
-
-    await interaction.deferReply({ ephemeral: true });
 
     const preview = successEmbed(
       'LAFD | Setup Permission Tiers',
@@ -66,7 +71,8 @@ module.exports = {
       .addFields(
         { name: '🔥 Fire Tiers', value: tierList('FIRE') },
         { name: '🚑 EMS Tiers', value: tierList('EMS') },
-        { name: 'Other', value: STANDALONE_TIERS.map((t) => `**${t.name}** — permissions only, not auto-assigned`).join('\n') }
+        { name: 'Other', value: STANDALONE_TIERS.map((t) => `**${t.name}** — permissions only, not auto-assigned`).join('\n') },
+        { name: 'Channel Access', value: CHANNEL_PERMISSIONS.map((c) => `**${c.label}** — per-tier overrides; hidden from everyone else`).join('\n') }
       );
 
     const { confirmed, timedOut } = await requestConfirmation(interaction, preview, 60000);
@@ -80,7 +86,11 @@ module.exports = {
     const count = (status) => roleResults.filter((r) => r.status === status).length;
     const roleFailures = roleResults.filter((r) => r.status === 'failed');
 
-    // Step 2: members
+    // Step 2: channel overrides
+    const channelResults = await applyChannelPermissions(interaction.guild, AUDIT_REASON);
+    const channelFailures = channelResults.flatMap((c) => c.failures.map((f) => `${c.label}: ${f}`));
+
+    // Step 3: members
     let membersChanged = 0;
     const memberFailures = [];
     try {
@@ -101,10 +111,14 @@ module.exports = {
 
     const lines = [
       `**Roles:** ${count('created')} created, ${count('updated')} updated, ${count('unchanged')} already correct, ${roleFailures.length} failed.`,
+      ...channelResults.map((c) => `**${c.label} access:** ${c.channels.length ? c.channels.map((n) => `#${n}`).join(', ') : 'no channel found'}`),
       `**Members:** ${membersChanged} member(s) had tier roles updated.`,
     ];
     if (roleFailures.length) {
       lines.push('', '**Role failures:**', ...roleFailures.map((r) => `• ${r.tier.name}: ${r.error}`));
+    }
+    if (channelFailures.length) {
+      lines.push('', '**Channel failures:**', ...channelFailures.slice(0, 10).map((f) => `• ${f}`));
     }
     if (memberFailures.length) {
       lines.push('', `**Member failures (${memberFailures.length}):**`, ...memberFailures.slice(0, 10).map((m) => `• ${m}`));
@@ -112,7 +126,7 @@ module.exports = {
       console.warn('[setup-permissions] Member sync failures:', memberFailures);
     }
 
-    const ok = roleFailures.length === 0 && memberFailures.length === 0;
+    const ok = roleFailures.length === 0 && channelFailures.length === 0 && memberFailures.length === 0;
     const summary = successEmbed(ok ? 'LAFD | Permission Tiers Ready' : 'LAFD | Permission Tiers Set Up With Errors', lines.join('\n'));
     if (!ok) summary.setColor(COLORS.WARNING);
     await interaction.editReply({ content: null, embeds: [summary], components: [] });
@@ -123,6 +137,7 @@ module.exports = {
       staff: interaction.user,
       details: {
         Roles: `${count('created')} created, ${count('updated')} updated, ${roleFailures.length} failed`,
+        Channels: `${channelResults.reduce((n, c) => n + c.channels.length, 0)} updated, ${channelFailures.length} failed`,
         Members: `${membersChanged} updated, ${memberFailures.length} failed`,
       },
     });
