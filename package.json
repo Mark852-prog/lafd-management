@@ -5,6 +5,7 @@
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
+    "setup": "node setup.js",
     "start": "node index.js",
     "deploy": "node deploy-commands.js"
   },
