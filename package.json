@@ -9,10 +9,10 @@
     "deploy": "node deploy-commands.js"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
-    "better-sqlite3": "^11.3.0",
+    "better-sqlite3": "12.11.1",
     "discord.js": "^14.15.3",
     "dotenv": "^16.4.5"
   },
