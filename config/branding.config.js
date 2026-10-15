@@ -1,23 +1,27 @@
 /**
  * branding.config.js
  * -----------------------------------------------------------------------
- * Visual identity used across every embed. Keeping this in one file makes
- * it easy to re-theme the bot later without touching command logic.
+ * Visual identity used across every embed. Re-theme the bot here without
+ * touching command logic.
  * -----------------------------------------------------------------------
  */
 
 require('dotenv').config();
 
 const LOGO_URL = process.env.LAFD_LOGO_URL || null;
+const DEPARTMENT_NAME = process.env.DEPARTMENT_NAME || 'Los Angeles Fire Department';
+const DEPARTMENT_SHORT = process.env.DEPARTMENT_SHORT || 'LAFD';
 
 const COLORS = {
-  FIRE: 0xc0392b, // deep red - Fire Department actions
-  EMS: 0x1f6fb2, // deep blue - EMS actions
-  NEUTRAL: 0x2c3440, // dark slate - general management / roster / shifts
-  SUCCESS: 0x2ecc71, // approvals / confirmations
-  WARNING: 0xf39c12, // notices / verbal warnings
-  DANGER: 0xe74c3c, // strikes / suspensions / terminations
-  ANNOUNCEMENT: 0x8e2b2b, // department-wide announcements
+  FIRE: 0xb3261e, // fire engine red
+  EMS: 0x1f5fae, // EMS blue
+  NEUTRAL: 0x2b2f36, // dark slate
+  BRAND: 0x9e1b1b, // LAFD crimson
+  SUCCESS: 0x2e9e5b,
+  WARNING: 0xe0a100,
+  DANGER: 0xd93a3a,
+  INFO: 0x3a7bd5,
+  GOLD: 0xc9a227, // commendations / promotions
 };
 
 const ICONS = {
@@ -27,14 +31,27 @@ const ICONS = {
   CALLSIGN: '📻',
   SHIFT: '🕒',
   ROSTER: '📋',
-  DISCIPLINE: '⚠️',
+  DISCIPLINE: '⚖️',
   ANNOUNCEMENT: '📢',
   PROMOTION: '⬆️',
   DEMOTION: '⬇️',
-  DENY: '✖️',
-  APPROVE: '✔️',
+  DENY: '❌',
+  APPROVE: '✅',
+  LEAVE: '🌴',
+  INCIDENT: '🚒',
+  TRAINING: '🎓',
+  SESSION: '📡',
+  CERT: '📜',
+  STAR: '⭐',
+  BLACKLIST: '⛔',
+  CONFIG: '⚙️',
+  ACTIVITY: '📊',
+  ON: '🟢',
+  OFF: '⚫',
+  AWAY: '🟡',
+  ALERT: '🔴',
 };
 
-const FOOTER_TEXT = 'Los Angeles Fire Department | LAFD Management';
+const FOOTER_TEXT = `${DEPARTMENT_NAME} • ${DEPARTMENT_SHORT} Management`;
 
-module.exports = { LOGO_URL, COLORS, ICONS, FOOTER_TEXT };
+module.exports = { LOGO_URL, DEPARTMENT_NAME, DEPARTMENT_SHORT, COLORS, ICONS, FOOTER_TEXT };

@@ -1,227 +1,182 @@
-# LAFD Management
+# LAFD Management v2
 
-A Discord management bot built specifically for a **Los Santos Fire Department (LAFD)** ER:LC roleplay department, using **discord.js v14**.
+A Discord management bot for the **Los Angeles Fire Department** ER:LC roleplay department, built on **discord.js v14**.
 
-The bot manages promotions, demotions, disciplinary records, callsigns, shifts, rosters, and announcements — all using your server's **existing** roles and channels. It never creates roles or channels.
+It runs the department end to end: hiring, promotions and the chain of command, discipline, leave, shifts and quotas, incident reports, sessions, trainings, certifications, commendations and blacklists. Every role and channel can be configured **from inside Discord** with `/config`.
 
 ---
 
-## 1. What this bot does
+## 1. Commands
 
-| Feature | Command(s) |
+Run `/help` in Discord to see only the commands *you* can use. Levels: **M** Member · **CO** Company Officer · **CS** Command Staff · **SS** Senior Staff · **DH** Department Head.
+
+### General
+| Command | Level | What it does |
+|---|---|---|
+| `/help` | M | Lists every command you have access to |
+| `/status` | M | Bot health, latency, on-duty count, config completeness |
+
+### Personnel
+| Command | Level | What it does |
+|---|---|---|
+| `/profile [member]` | M | Full service record: ranks, callsign, status, weekly quota, certifications, commendations, rank history (+ discipline summary for SS) |
+| `/roster [division] [on_duty_only]` | M | **Live** roster built from actual Discord roles, grouped by rank |
+| `/rank hire` | SS | Brings someone into Fire or EMS at a starting rank (rank + division + member roles) |
+| `/rank promote` / `demote` | SS | Leave `rank` empty to move exactly one step. Confirmation required |
+| `/rank history` | M | Every hire/promotion/demotion for a member |
+| `/callsign request` | M | Request a callsign → Approve/Deny buttons for officers (deny asks for a reason) |
+| `/callsign assign` / `revoke` | CO | Direct callsign management |
+| `/callsign lookup` / `list` | M | Who holds a callsign / every assigned callsign |
+| `/leave request` | M | Leave of absence with optional future start date → approval buttons |
+| `/leave place` | SS | Administrative leave (optionally indefinite) |
+| `/leave end` / `status` / `list` | M / CO | End early, view status, list everyone on leave |
+| `/cert grant` / `revoke` | CS | Certifications, with optional linked roles |
+| `/cert view` / `holders` | M | A member's certifications / everyone holding one |
+| `/commend` | CO | Public commendation (Lifesaving Award, Medal of Valor, …) |
+
+### Operations
+| Command | Level | What it does |
+|---|---|---|
+| `/shift start` / `end` | M | Clock in/out; gives/removes the On Duty role, shows weekly quota progress |
+| `/shift status` / `active` | M | Your shift + recent shifts / who's on duty by division |
+| `/shift force-end` | CO | End someone else's shift |
+| `/incident report` | M | Opens a form → numbered report (`INC-00042`) for fires, medicals, DOAs, MCIs, rescues… |
+| `/incident view` / `recent` / `stats` | M | Look up, browse, and chart incidents |
+| `/incident void` | CS | Void a duplicate/incorrect report |
+| `/session start` / `end` / `active` | CS | Department or division sessions with Join/End/Cancel buttons and attendance tracking |
+| `/training host` | CO | Schedule a training with RSVP buttons and role ping |
+| `/training log` | CO | Record pass/fail; a pass can award a certification automatically |
+| `/training history` / `upcoming` | M | Training record / scheduled trainings |
+| `/activity check` | M | Hours, shifts, incidents, sessions, trainings, commendations for any period |
+| `/activity leaderboard` | M | Top members by hours on duty |
+| `/activity quota` | CS | Who met the weekly quota — excuses members on leave/suspended or hired this week |
+
+### Discipline
+| Command | Level | What it does |
+|---|---|---|
+| `/discipline issue` | SS | Notice, Verbal Warning, Warning, Strike, **Suspension**, **Demotion**, **Termination** |
+| `/discipline revoke` | SS | Void a record (lifts a running suspension) |
+| `/discipline history` / `case` | SS | Full history / one case in detail |
+| `/blacklist add` / `remove` / `check` / `list` | SS | Works for users **not** in the server (paste their ID) |
+
+Severe actions are carried out automatically after confirmation:
+- **Suspension** — `Suspended` role, shift ended, lifted automatically after `days`. Rejoining the server re-applies it.
+- **Demotion** — drops one rank in the member's primary division.
+- **Termination** / **Blacklist** — strips every department role, ends shift/leave, releases the callsign.
+- Other types accept `days` to auto-expire the record.
+
+### Management
+| Command | Level | What it does |
+|---|---|---|
+| `/announce` | SS | Form-based announcement, any channel, style presets, optional role ping |
+| `/config view` / `check` | DH | All settings / diagnostics (missing roles, role order, channel permissions) |
+| `/config channel` / `role` / `rank` / `clear` | DH | Link features to your channels and roles — no restart needed |
+| `/config autosetup` | DH | **Creates any missing channels and roles** and links them |
+
+> Server **Administrators** and the server owner can always use `/config`, so a brand-new server can be set up before any rank is linked.
+
+---
+
+## 2. Chain of command
+
+Permissions come from the rank roles a member holds (never Discord's Administrator permission, except for `/config`). On top of the level checks:
+
+- You can only act on members **ranked below you** (level first, then position in the same ladder).
+- You can only assign ranks **below your own authority** — a Deputy Chief can promote to Assistant Chief, but not to Deputy Chief.
+- Nobody can promote, discipline, or approve requests for **themselves**.
+- Promote must move up, demote must move down.
+
+| Level | Ranks |
 |---|---|
-| Request a callsign | `/request callsign` |
-| Approve/deny callsigns | Buttons on the request (posted to your callsign request channel) |
-| Issue a formal warning | `/warn` |
-| Issue any infraction type | `/infract` |
-| View disciplinary history | `/infractions` |
-| Remove a disciplinary record | `/clear-infraction` |
-| Promote a member | `/promote` |
-| Demote a member | `/demote` |
-| Post an announcement | `/announce` |
-| View the roster | `/roster` |
-| View a member's profile | `/member` |
-| Start/end a shift | `/shift start`, `/shift end` |
-| View who's on duty | `/on-duty` |
-| Health check | `/ping` |
+| 4 — Department Head | Fire Chief, Medical Director |
+| 3 — Senior Staff | Assistant/Deputy Fire Chief, Assistant/Deputy Medical Director |
+| 2 — Command Staff | Battalion Chief, High Rank, Division Medical Officer, EMS (Senior) High Rank |
+| 1 — Company Officer | Lieutenant, Captain, Paramedic Lieutenant, Paramedic Captain, **Supervisory Team** role |
+| 0 — Member | Everyone else |
 
-Every action that matters (promotions, demotions, infractions, callsigns, shifts) is written to a local SQLite database and posted to your existing logging channels.
+Change who can do what in `config/permissions.config.js`.
 
 ---
 
-## 2. Project structure
+## 3. Setup
 
-```
-lafd-management/
-├── commands/
-│   ├── callsign/         → /request callsign
-│   ├── discipline/       → /warn, /infract, /infractions, /clear-infraction
-│   ├── management/       → /promote, /demote, /announce
-│   ├── roster/           → /roster, /member
-│   ├── shifts/           → /shift, /on-duty
-│   └── general/          → /ping
-├── events/
-│   ├── ready.js            Logs in and confirms the bot is online
-│   └── interactionCreate.js Routes slash commands, autocomplete, and callsign buttons
-├── utils/
-│   ├── permissions.js     Centralized rank → permission level logic
-│   ├── embeds.js          Every embed builder (promotion, infraction, callsign, etc.)
-│   ├── logger.js          Sends log embeds to your configured logging channels
-│   ├── confirmation.js    Reusable Confirm/Cancel button flow
-│   └── replies.js         Consistent "no permission" / error replies
-├── database/
-│   └── db.js               SQLite schema + all queries (creates lafd.sqlite automatically)
-├── config/
-│   ├── roles.config.js     Fire & EMS rank ladders, mapped to your role IDs
-│   ├── channels.config.js  Callsign/announcement/logging channel IDs
-│   ├── permissions.config.js  Permission levels required per command
-│   ├── branding.config.js  Colors, icons, footer text, logo URL
-│   └── index.js            Barrel file + startup validation
-├── deploy-commands.js     Registers slash commands with Discord
-├── index.js               Bot entry point
-├── package.json
-├── .env.example
-└── .gitignore
-```
+### Requirements
+- Node.js 18+
+- A Discord application with a bot user
 
----
-
-## 3. Requirements
-
-- [Node.js](https://nodejs.org/) version 18 or newer
-- A Discord bot application (created at https://discord.com/developers/applications)
-- Your existing LAFD Discord server, with its roles and channels already created
-
----
-
-## 4. Installation
-
-Open a terminal in the `lafd-management` folder and run:
-
+### Install
 ```
 npm install
+cp .env.example .env     # fill in DISCORD_TOKEN, CLIENT_ID, GUILD_ID
 ```
 
-This installs `discord.js`, `better-sqlite3`, and `dotenv`.
+### Developer Portal
+1. **Bot → Privileged Gateway Intents → enable “Server Members Intent”.** (Required for the live roster, quota checks and blacklist enforcement. The bot tells you if it's missing.)
+2. **OAuth2 → URL Generator** — scopes `bot` + `applications.commands`; permissions **Manage Roles, Manage Channels, Send Messages, Embed Links, Read Message History** (+ Kick/Ban Members if you use `BLACKLIST_ACTION=kick|ban`).
+3. Invite the bot, then in **Server Settings → Roles** drag the bot's role **above every rank/status role** it manages.
 
----
-
-## 5. Configure the bot
-
-1. Copy `.env.example` to a new file named `.env`.
-2. Fill in every value described below.
-
-### 5.1 Core bot settings
-
-| Variable | Where to find it |
-|---|---|
-| `DISCORD_TOKEN` | Discord Developer Portal → your application → **Bot** → Reset Token |
-| `CLIENT_ID` | Discord Developer Portal → your application → **General Information** → Application ID |
-| `GUILD_ID` | Right-click your LAFD server icon in Discord (with Developer Mode on) → Copy Server ID |
-
-> **Never share your bot token or commit your `.env` file.** `.gitignore` already excludes it.
-
-To enable Developer Mode in Discord: **User Settings → Advanced → Developer Mode**. Once enabled, you can right-click any server, channel, or role and select "Copy ID".
-
-### 5.2 Fire & EMS rank role IDs
-
-For every rank listed in `.env.example` (e.g. `FIRE_ROLE_FIREFIGHTER_I`), right-click the matching **existing** role in your server's Role list (Server Settings → Roles) and paste its ID.
-
-Ranks you leave blank simply won't be usable for promotions/demotions until configured — the bot will still run.
-
-### 5.3 Special roles
-
-`SPECIAL_ROLE_APPARATUS_OPERATOR` and `SPECIAL_ROLE_SUPERVISORY_TEAM` are **not** part of the rank ladder and are never touched by promotion/demotion. They're included for future features.
-
-### 5.4 Channels
-
-| Variable | Purpose |
-|---|---|
-| `CHANNEL_CALLSIGN_REQUESTS` | Where `/request callsign` posts its approval embed |
-| `CHANNEL_ANNOUNCEMENTS` | Where `/announce` posts |
-| `LOG_CHANNEL_DEFAULT` | Fallback log channel used if a specific one below isn't set |
-| `LOG_CHANNEL_MANAGEMENT` | Promotions, demotions, announcements |
-| `LOG_CHANNEL_DISCIPLINE` | Warnings, infractions, infraction removals |
-| `LOG_CHANNEL_CALLSIGNS` | Callsign approvals/denials |
-| `LOG_CHANNEL_SHIFTS` | Shift starts/ends |
-
-### 5.5 Branding
-
-`LAFD_LOGO_URL` — a direct image URL (must end in `.png`/`.jpg`/etc., e.g. hosted on Discord or Imgur) used as the thumbnail across every embed. Optional but recommended.
-
-The bot's **avatar** itself is set separately in the Discord Developer Portal (Bot → App Icon) — upload the same LAFD logo there.
-
----
-
-## 6. Invite the bot to your server
-
-In the Developer Portal, go to **OAuth2 → URL Generator**:
-- Scopes: `bot`, `applications.commands`
-- Bot Permissions: `Send Messages`, `Embed Links`, `Manage Roles`, `Read Message History`, `Use Slash Commands`
-
-Open the generated URL and invite the bot to your **existing** LAFD server.
-
-**Important:** In Server Settings → Roles, drag the bot's role **above** every Fire/EMS rank role it needs to assign. Discord bots can only manage roles positioned below their own highest role.
-
----
-
-## 7. Register slash commands
-
-Every time you add a command or change its options, run:
-
+### Register commands and start
 ```
-npm run deploy
-```
-
-(This calls `deploy-commands.js`, which registers commands to your `GUILD_ID` so they show up instantly.)
-
----
-
-## 8. Start the bot
-
-```
+npm run deploy     # registers all slash commands (also removes the old v1 commands)
 npm start
 ```
 
-You should see:
+### Configure from Discord
+1. `/config rank` — link each rank to its role (or fill `FIRE_ROLE_*` / `EMS_ROLE_*` in `.env`).
+2. `/config autosetup scope:Channels and roles` — creates any missing channels/roles, **or** link existing ones with `/config channel` and `/config role`.
+3. `/config check` — confirms role order and channel permissions are correct.
+
+---
+
+## 4. Automation
+
+A background job runs every minute:
+- Shifts longer than `SHIFT_MAX_HOURS` (default 12) are closed and the member is DM'd — no more forgotten shifts inflating hours.
+- Scheduled leaves start, finished leaves end (roles applied/removed, member DM'd).
+- Suspensions are lifted and time-limited infractions expire.
+
+Event hooks:
+- A **blacklisted** user joining triggers a discipline-log alert (or kick/ban per `BLACKLIST_ACTION`).
+- A **suspended** member who rejoins gets the Suspended role back.
+- A member who leaves mid-shift has their shift closed.
+
+---
+
+## 5. Project structure
 ```
-[LAFD Management] Loaded 13 command(s).
-[LAFD Management] Logged in as YourBot#0000
+commands/
+  general/      help, status
+  personnel/    profile, roster, rank, callsign, leave, cert, commend
+  operations/   shift, incident, session, training, activity
+  discipline/   discipline, blacklist
+  management/   announce, config
+services/       shared business logic (shifts, leave, discipline, sessions/trainings)
+events/         ready, interactionCreate (router), guildMemberAdd, guildMemberRemove
+utils/          permissions, embeds, members (safe role changes), logger, paginator, scheduler, …
+config/         ranks & roles, channels, permissions, department policy, branding, settings layer
+database/db.js  SQLite schema, in-place migrations, all queries
 ```
 
----
-
-## 9. Permission system
-
-Permissions are based entirely on the **existing rank role** a member holds — never Discord's Administrator permission. This is centralized in `config/permissions.config.js` and `utils/permissions.js`, so you can change who can do what in one place.
-
-| Level | Ranks | Can do |
-|---|---|---|
-| 4 — Department Head | Fire Chief, Medical Director | Everything |
-| 3 — Senior Staff | Deputy/Assistant Fire Chief, Assistant Medical Director | Promote, demote, infract, announce, callsigns, roster |
-| 2 — Command Staff | High Rank, EMS High Rank, EMS Senior High Rank, Battalion Chief, Division Medical Officer | Callsigns, roster, department management |
-| 1 — Company Officer | Lieutenant, Captain, Paramedic Lieutenant, Paramedic Captain | Callsigns, roster, shifts |
-| 0 — Member | Everyone else | View roster, own profile, own shifts |
-
-Levels are **cumulative** — a level 3 staffer can do everything a level 1 staffer can.
+**Adding a command:** drop a file in `commands/<category>/` exporting `{ category, level, data, execute }` (optionally `levels` per subcommand, `autocomplete`, and `componentPrefix` + `handleComponent` for persistent buttons), then `npm run deploy`.
 
 ---
 
-## 10. Database
+## 6. Upgrading from v1
 
-Uses **SQLite** via `better-sqlite3` — a single file (`database/lafd.sqlite`) that's created automatically the first time the bot runs. No external database server needed. It's excluded from git via `.gitignore`.
+- Your existing `database/lafd.sqlite` is upgraded automatically on first start — no data is lost.
+- Your existing `.env` keeps working. `SPECIAL_ROLE_APPARATUS_OPERATOR` and `SPECIAL_ROLE_SUPERVISORY_TEAM` are still read.
+- Old callsign request buttons still work.
+- Run `npm run deploy` once — old commands are replaced:
 
-Tables: `members`, `shifts`, `discipline`, `history`, `callsign_requests`. See the top of `database/db.js` for the full schema.
+| v1 | v2 |
+|---|---|
+| `/promote`, `/demote` | `/rank promote`, `/rank demote` |
+| `/warn`, `/infract` | `/discipline issue` |
+| `/infractions` | `/discipline history` |
+| `/clear-infraction` | `/discipline revoke` |
+| `/member` | `/profile` |
+| `/on-duty` | `/shift active` |
+| `/request callsign` | `/callsign request` |
+| `/ping` | `/status` |
 
----
-
-## 11. Tickets
-
-Your server's existing ticket system was **not** replaced or duplicated — I don't have access to its specific bot/API to integrate directly. The codebase is structured so ticket integration can be added later (e.g. a new `commands/tickets/` folder and a `utils/tickets.js` helper) once you tell the next developer which ticket bot/system you're using.
-
----
-
-## 12. What you still need to provide
-
-- [ ] `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`
-- [ ] All `FIRE_ROLE_*` and `EMS_ROLE_*` role IDs you want active
-- [ ] `SPECIAL_ROLE_APPARATUS_OPERATOR`, `SPECIAL_ROLE_SUPERVISORY_TEAM` (optional, for future use)
-- [ ] `CHANNEL_CALLSIGN_REQUESTS`, `CHANNEL_ANNOUNCEMENTS`
-- [ ] `LOG_CHANNEL_*` channel IDs
-- [ ] `LAFD_LOGO_URL` (optional but recommended)
-- [ ] Invite the bot and move its role above the rank roles
-- [ ] Run `npm install` → `npm run deploy` → `npm start`
-
----
-
-## 13. Continuing development
-
-This project is intentionally modular so another developer (or AI) can extend it easily:
-
-- **New command?** Add a file to the right subfolder in `commands/`, export `{ data, execute }`, run `npm run deploy`.
-- **New permission rule?** Edit `config/permissions.config.js` only.
-- **New embed style?** Add a builder function to `utils/embeds.js`.
-- **New rank/role?** Add it to `config/roles.config.js` and `.env.example`.
-- **Ticket system integration:** see section 11 above.
-
-No IDs are hardcoded anywhere in command logic — everything server-specific lives in `config/` and `.env`.
+- **Rank order fix:** the Fire ladder is now Junior Engineer → Engineer → Senior Engineer (v1 had Junior Engineer above Senior Engineer).

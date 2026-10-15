@@ -1,122 +1,82 @@
-const { Events } = require('discord.js');
-const { REQUIRED_LEVEL, getMemberRank } = require('../config');
-const { hasPermission } = require('../utils/permissions');
-const { callsignApprovedEmbed, callsignDeniedEmbed, errorEmbed } = require('../utils/embeds');
-const { getCallsignRequest, decideCallsignRequest, setMemberCallsign, addHistoryEntry, upsertMember } = require('../database/db');
-const { logCallsigns } = require('../utils/logger');
+/**
+ * events/interactionCreate.js
+ * -----------------------------------------------------------------------
+ * Routes every interaction:
+ *   - slash commands      -> command.execute
+ *   - autocomplete        -> command.autocomplete
+ *   - buttons/selects/    -> the command whose `componentPrefix` matches
+ *     modals                 the first segment of the customId
+ *                            ("callsign:approve:12" -> /callsign)
+ * Components handled by short-lived collectors (confirmations, page
+ * buttons, inline modals) have no registered prefix and are ignored here.
+ * -----------------------------------------------------------------------
+ */
+
+const { Events, MessageFlags } = require('discord.js');
+const { errorEmbed } = require('../utils/embeds');
+
+async function reportFailure(interaction, label, err) {
+  console.error(`[Interactions] ${label} failed:`, err);
+  const payload = {
+    content: null,
+    embeds: [errorEmbed('Something went wrong while processing that. The error has been logged for the bot maintainer.', 'Unexpected Error')],
+    components: [],
+  };
+  try {
+    if (interaction.deferred || interaction.replied) await interaction.followUp({ ...payload, flags: MessageFlags.Ephemeral });
+    else await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+  } catch {
+    /* interaction expired - nothing else we can do */
+  }
+}
+
+/** Old (v1) callsign buttons used "callsign_approve_12" - keep them working. */
+function normalizeCustomId(customId) {
+  const legacy = /^callsign_(approve|deny)_(\d+)$/.exec(customId);
+  return legacy ? `callsign:${legacy[1]}:${legacy[2]}` : customId;
+}
 
 module.exports = {
   name: Events.InteractionCreate,
   async execute(interaction) {
-    // ---------------------------------------------------------------
-    // Slash commands
-    // ---------------------------------------------------------------
+    if (!interaction.inGuild()) {
+      if (interaction.isRepliable()) {
+        await interaction.reply({ content: 'LAFD Management commands can only be used inside the department server.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      }
+      return;
+    }
+
     if (interaction.isChatInputCommand()) {
       const command = interaction.client.commands.get(interaction.commandName);
       if (!command) return;
-
       try {
         await command.execute(interaction);
       } catch (err) {
-        console.error(`Error executing /${interaction.commandName}:`, err);
-        const payload = { content: 'Something went wrong while running that command.', embeds: [], components: [], ephemeral: true };
-        if (interaction.replied || interaction.deferred) {
-          await interaction.editReply(payload).catch(() => {});
-        } else {
-          await interaction.reply(payload).catch(() => {});
-        }
+        await reportFailure(interaction, `/${interaction.commandName}`, err);
       }
       return;
     }
 
-    // ---------------------------------------------------------------
-    // Autocomplete
-    // ---------------------------------------------------------------
     if (interaction.isAutocomplete()) {
       const command = interaction.client.commands.get(interaction.commandName);
-      if (!command || !command.autocomplete) return;
+      if (!command?.autocomplete) return;
       try {
         await command.autocomplete(interaction);
       } catch (err) {
-        console.error(`Error in autocomplete for /${interaction.commandName}:`, err);
+        console.error(`[Interactions] Autocomplete for /${interaction.commandName} failed:`, err);
+        await interaction.respond([]).catch(() => {});
       }
       return;
     }
 
-    // ---------------------------------------------------------------
-    // Callsign approve/deny buttons
-    // (Confirmation buttons for promote/demote/infract are handled
-    // inline by utils/confirmation.js via awaitMessageComponent.)
-    // ---------------------------------------------------------------
-    if (interaction.isButton()) {
-      const [scope, action, requestIdRaw] = interaction.customId.split('_');
-      if (scope !== 'callsign') return;
-
-      if (!hasPermission(interaction.member, REQUIRED_LEVEL.CALLSIGN_APPROVE)) {
-        return interaction.reply({
-          embeds: [errorEmbed('You do not have permission to approve or deny callsign requests.')],
-          ephemeral: true,
-        });
-      }
-
-      const requestId = Number(requestIdRaw);
-      const request = getCallsignRequest(requestId);
-      if (!request) {
-        return interaction.reply({ embeds: [errorEmbed('This callsign request no longer exists.')], ephemeral: true });
-      }
-      if (request.status !== 'PENDING') {
-        return interaction.reply({ embeds: [errorEmbed(`This request has already been ${request.status.toLowerCase()}.`)], ephemeral: true });
-      }
-
-      const targetMember = await interaction.guild.members.fetch(request.discord_id).catch(() => null);
-      if (!targetMember) {
-        return interaction.reply({ embeds: [errorEmbed('That member could not be found in this server.')], ephemeral: true });
-      }
-
-      if (action === 'approve') {
-        decideCallsignRequest(requestId, 'APPROVED', interaction.user.id);
-        setMemberCallsign(targetMember.id, request.requested_callsign);
-        const rank = getMemberRank(targetMember);
-        upsertMember({ discordId: targetMember.id, username: targetMember.user.username, department: rank?.department, rankRoleId: rank?.roleId });
-        addHistoryEntry({
-          discordId: targetMember.id,
-          actionType: 'CALLSIGN_REQUEST',
-          oldValue: null,
-          newValue: request.requested_callsign,
-          actorId: interaction.user.id,
-          reason: 'Approved',
-        });
-
-        const embed = callsignApprovedEmbed({ member: targetMember, callsign: request.requested_callsign, approvedBy: interaction.user });
-        await interaction.update({ embeds: [embed], components: [] });
-
-        await logCallsigns(interaction.guild, {
-          action: 'Callsign Approved',
-          member: targetMember,
-          staff: interaction.user,
-          details: { Callsign: request.requested_callsign },
-        });
-
-        targetMember.send({ embeds: [embed] }).catch(() => {});
-      } else if (action === 'deny') {
-        decideCallsignRequest(requestId, 'DENIED', interaction.user.id);
-
-        const embed = callsignDeniedEmbed({
-          member: targetMember,
-          callsign: request.requested_callsign,
-          deniedBy: interaction.user,
-          reason: 'Denied by LAFD management.',
-        });
-        await interaction.update({ embeds: [embed], components: [] });
-
-        await logCallsigns(interaction.guild, {
-          action: 'Callsign Denied',
-          member: targetMember,
-          staff: interaction.user,
-          details: { 'Requested Callsign': request.requested_callsign },
-        });
-
-        targetMember.send({ embeds: [embed] }).catch(() => {});
+    if (interaction.isMessageComponent() || interaction.isModalSubmit()) {
+      const [prefix, ...args] = normalizeCustomId(interaction.customId).split(':');
+      const handler = interaction.client.componentHandlers.get(prefix);
+      if (!handler) return;
+      try {
+        await handler.handleComponent(interaction, args);
+      } catch (err) {
+        await reportFailure(interaction, `component ${interaction.customId}`, err);
       }
     }
   },
