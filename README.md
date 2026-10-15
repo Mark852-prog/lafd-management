@@ -115,11 +115,11 @@ cp .env.example .env     # fill in DISCORD_TOKEN, CLIENT_ID, GUILD_ID
 2. **OAuth2 → URL Generator** — scopes `bot` + `applications.commands`; permissions **Manage Roles, Manage Channels, Send Messages, Embed Links, Read Message History** (+ Kick/Ban Members if you use `BLACKLIST_ACTION=kick|ban`).
 3. Invite the bot, then in **Server Settings → Roles** drag the bot's role **above every rank/status role** it manages.
 
-### Register commands and start
-```
-npm run deploy     # registers all slash commands (also removes the old v1 commands)
-npm start
-```
+### Start
+- **Windows:** double-click `start.bat`. **Mac/Linux:** run `./start.sh`. (Both install dependencies and auto-restart the bot if it crashes.)
+- Or manually: `npm start`
+
+Slash commands are registered automatically on every start (old v1 commands are replaced). `npm run deploy` still works if you prefer doing it by hand.
 
 ### Configure from Discord
 1. `/config rank` — link each rank to its role (or fill `FIRE_ROLE_*` / `EMS_ROLE_*` in `.env`).
