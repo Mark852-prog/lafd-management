@@ -15,7 +15,10 @@ const config = require('./config');
 config.validateCoreConfig();
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  // GuildMembers is a privileged intent - enable "Server Members Intent" in the
+  // Developer Portal (Bot tab). It powers the live roster, quota checks and
+  // blacklist enforcement.
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
   partials: [Partials.GuildMember, Partials.User],
 });
 
@@ -23,6 +26,7 @@ const client = new Client({
 // Load commands recursively from /commands
 // -------------------------------------------------------------------
 client.commands = new Collection();
+client.componentHandlers = new Collection();
 
 function loadCommands(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -36,6 +40,9 @@ function loadCommands(dir) {
         continue;
       }
       client.commands.set(command.data.name, command);
+      if (command.componentPrefix && command.handleComponent) {
+        client.componentHandlers.set(command.componentPrefix, command);
+      }
     }
   }
 }
@@ -49,11 +56,22 @@ console.log(`[LAFD Management] Loaded ${client.commands.size} command(s).`);
 const eventsDir = path.join(__dirname, 'events');
 for (const file of fs.readdirSync(eventsDir).filter((f) => f.endsWith('.js'))) {
   const event = require(path.join(eventsDir, file));
-  if (event.once) {
-    client.once(event.name, (...args) => event.execute(...args));
-  } else {
-    client.on(event.name, (...args) => event.execute(...args));
-  }
+  const handler = (...args) =>
+    Promise.resolve(event.execute(...args)).catch((err) => console.error(`[Events] ${event.name} handler failed:`, err));
+  if (event.once) client.once(event.name, handler);
+  else client.on(event.name, handler);
 }
 
-client.login(config.DISCORD_TOKEN);
+process.on('unhandledRejection', (err) => console.error('[LAFD Management] Unhandled promise rejection:', err));
+
+client.login(config.DISCORD_TOKEN).catch((err) => {
+  if (String(err?.message).includes('disallowed intents') || err?.code === 'DisallowedIntents') {
+    console.error(
+      '\n[LAFD Management] Discord rejected the login because the Server Members Intent is disabled.\n' +
+        'Fix: Developer Portal -> your application -> Bot -> Privileged Gateway Intents -> enable "Server Members Intent".\n'
+    );
+  } else {
+    console.error('[LAFD Management] Failed to log in:', err);
+  }
+  process.exit(1);
+});

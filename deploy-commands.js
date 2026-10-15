@@ -1,13 +1,14 @@
 /**
  * deploy-commands.js
  * -----------------------------------------------------------------------
- * Registers all slash commands with Discord for your specific server
- * (guild commands update instantly, unlike global commands which can
- * take up to an hour to propagate). Run this once initially, and again
- * any time you add/change a command's options.
+ * Registers all slash commands with Discord for your server (guild
+ * commands update instantly). Run once initially and again any time you
+ * add/change a command's options:
  *
- *   node deploy-commands.js
- *   (or: npm run deploy)
+ *   npm run deploy
+ *
+ * This REPLACES the server's command list, so commands removed from the
+ * codebase (e.g. the old /warn, /infract, /promote) disappear too.
  * -----------------------------------------------------------------------
  */
 
@@ -33,14 +34,14 @@ function collectCommandData(dir) {
 }
 
 const commands = collectCommandData(path.join(__dirname, 'commands'));
-
 const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
 
 (async () => {
   try {
     console.log(`[Deploy] Registering ${commands.length} slash command(s) to guild ${GUILD_ID}...`);
     await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
-    console.log('[Deploy] Successfully registered commands.');
+    console.log('[Deploy] Successfully registered commands:');
+    console.log(`         ${commands.map((c) => `/${c.name}`).join('  ')}`);
   } catch (err) {
     console.error('[Deploy] Failed to register commands:', err);
     process.exit(1);

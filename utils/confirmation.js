@@ -1,45 +1,46 @@
 /**
  * utils/confirmation.js
  * -----------------------------------------------------------------------
- * Reusable "are you sure?" confirmation flow using buttons. Used for
- * promotions, demotions, suspensions, terminations, and infraction
- * removal. Only the person who initiated the action can press the
- * buttons - everyone else gets an ephemeral rejection.
+ * Reusable "are you sure?" flow with Confirm/Cancel buttons. Only the
+ * person who ran the command can press them.
  * -----------------------------------------------------------------------
  */
 
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { respond } = require('./replies');
 
 /**
- * Sends a confirmation prompt and resolves with true/false based on the
- * initiating user's button click, or null if it timed out.
- *
- * @param {import('discord.js').ChatInputCommandInteraction} interaction - the original interaction (already replied/deferred ephemerally)
- * @param {import('discord.js').EmbedBuilder} embed - the embed describing the action to confirm
- * @param {number} timeoutMs - how long to wait for a response
+ * Shows `embed` with Confirm/Cancel buttons and waits for the initiating
+ * user. Resolves { confirmed, timedOut }. When not confirmed, the prompt
+ * is replaced with a short "cancelled"/"timed out" note automatically.
  */
-async function requestConfirmation(interaction, embed, timeoutMs = 30000) {
-  const confirmId = `confirm_${interaction.id}`;
-  const cancelId = `cancel_${interaction.id}`;
+async function requestConfirmation(interaction, embed, { timeoutMs = 60000, confirmLabel = 'Confirm', danger = false } = {}) {
+  const confirmId = `confirm:yes:${interaction.id}`;
+  const cancelId = `confirm:no:${interaction.id}`;
 
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(confirmId).setLabel('Confirm').setStyle(ButtonStyle.Success).setEmoji('✅'),
-    new ButtonBuilder().setCustomId(cancelId).setLabel('Cancel').setStyle(ButtonStyle.Danger).setEmoji('❌')
+    new ButtonBuilder().setCustomId(confirmId).setLabel(confirmLabel).setStyle(danger ? ButtonStyle.Danger : ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(cancelId).setLabel('Cancel').setStyle(ButtonStyle.Secondary)
   );
 
-  const message = await interaction.editReply({ embeds: [embed], components: [row] });
+  const message = await respond(interaction, { embeds: [embed], components: [row] });
+  const prompt = message ?? (await interaction.fetchReply());
 
   try {
-    const buttonInteraction = await message.awaitMessageComponent({
+    const click = await prompt.awaitMessageComponent({
       filter: (i) => i.user.id === interaction.user.id && (i.customId === confirmId || i.customId === cancelId),
       time: timeoutMs,
     });
-
-    const confirmed = buttonInteraction.customId === confirmId;
-    await buttonInteraction.update({ components: [] });
-    return { confirmed, followUp: buttonInteraction };
+    const confirmed = click.customId === confirmId;
+    await click.update({ components: [] });
+    if (!confirmed) {
+      await interaction.editReply({ content: '✖️ Action cancelled. Nothing was changed.', embeds: [], components: [] });
+    }
+    return { confirmed, timedOut: false };
   } catch {
-    await interaction.editReply({ components: [] }).catch(() => {});
+    await interaction
+      .editReply({ content: '⌛ Confirmation timed out. Nothing was changed.', embeds: [], components: [] })
+      .catch(() => {});
     return { confirmed: false, timedOut: true };
   }
 }
