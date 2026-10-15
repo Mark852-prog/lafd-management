@@ -1,9 +1,11 @@
 /**
  * database/db.js
  * -----------------------------------------------------------------------
- * A single SQLite database (via better-sqlite3) for all persistent data.
- * better-sqlite3 is synchronous, which keeps the code simple and is more
- * than fast enough for a Discord bot's workload.
+ * A single SQLite database for all persistent data, using Node's BUILT-IN
+ * SQLite (node:sqlite, Node 22.13+). There is no native package to
+ * download or compile, so installs work on any host or PC. It is
+ * synchronous, which keeps the code simple and is more than fast enough
+ * for a Discord bot's workload.
  *
  * The file is created automatically at database/lafd.sqlite (git-ignored).
  * Existing databases from the previous version are upgraded in place -
@@ -12,13 +14,19 @@
  */
 
 const path = require('path');
-const Database = require('better-sqlite3');
+
+// node:sqlite prints an "experimental feature" warning on load - hide just that one.
+const originalEmitWarning = process.emitWarning;
+process.emitWarning = (warning, ...args) =>
+  String(warning?.message ?? warning).includes('SQLite is an experimental') ? undefined : originalEmitWarning.call(process, warning, ...args);
+const { DatabaseSync } = require('node:sqlite');
+process.emitWarning = originalEmitWarning;
 
 const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'lafd.sqlite');
-const db = new Database(DB_PATH);
+const db = new DatabaseSync(DB_PATH);
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+db.exec('PRAGMA journal_mode = WAL');
+db.exec('PRAGMA foreign_keys = ON');
 
 const now = () => new Date().toISOString();
 
