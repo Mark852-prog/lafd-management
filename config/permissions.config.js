@@ -39,6 +39,7 @@ const REQUIRED_LEVEL = {
   LEAVE_REQUEST: L.MEMBER,
   INCIDENT_REPORT: L.MEMBER,
   ACTIVITY_SELF: L.MEMBER,
+  RESIGN: L.MEMBER,
 
   // Company Officer
   CALLSIGN_MANAGE: L.COMPANY_OFFICER, // approve/deny/assign/revoke callsigns
@@ -63,9 +64,11 @@ const REQUIRED_LEVEL = {
   ADMIN_LEAVE: L.SENIOR_STAFF,
   BLACKLIST: L.SENIOR_STAFF,
   ANNOUNCE: L.SENIOR_STAFF,
+  RESIGNATION_MANAGE: L.SENIOR_STAFF, // accept/decline resignations
 
   // Department Head (server Administrators may also use /config to bootstrap)
   CONFIG: L.DEPARTMENT_HEAD,
+  EMBED_BUILDER: L.DEPARTMENT_HEAD, // /embed (also always allowed for server Administrators)
 };
 
 module.exports = { PERMISSION_LEVELS, LEVEL_NAMES, REQUIRED_LEVEL };

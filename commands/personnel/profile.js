@@ -19,6 +19,7 @@ const { LEAVE_TYPES } = require('../../services/leave');
 
 function statusLine(member, record) {
   if (record?.status === 'TERMINATED') return `${ICONS.ALERT} Terminated`;
+  if (record?.status === 'RESIGNED') return `${ICONS.OFF} Resigned`;
   const suspension = db.getActiveSuspension(member.id);
   if (suspension) return `${ICONS.ALERT} Suspended${suspension.expires_at ? ` until ${ts(suspension.expires_at, 'D')}` : ''}`;
   const leave = db.getActiveLeave(member.id);
@@ -49,7 +50,7 @@ module.exports = {
     const allTime = db.getShiftStats(member.id, null);
     const certs = db.getCertifications(member.id);
     const commendations = db.getCommendations(member.id, 3);
-    const rankHistory = db.getHistory(member.id, 5, ['HIRE', 'PROMOTION', 'DEMOTION', 'TERMINATION']);
+    const rankHistory = db.getHistory(member.id, 5, ['HIRE', 'PROMOTION', 'DEMOTION', 'TERMINATION', 'RESIGNATION']);
 
     const embed = baseEmbed({
       color: departmentColor(primary?.department),
@@ -84,7 +85,7 @@ module.exports = {
       );
     }
     if (rankHistory.length) {
-      const icon = { HIRE: ICONS.BADGE, PROMOTION: ICONS.PROMOTION, DEMOTION: ICONS.DEMOTION, TERMINATION: ICONS.DENY };
+      const icon = { HIRE: ICONS.BADGE, PROMOTION: ICONS.PROMOTION, DEMOTION: ICONS.DEMOTION, TERMINATION: ICONS.DENY, RESIGNATION: '👋' };
       addField(
         embed,
         'Rank History',

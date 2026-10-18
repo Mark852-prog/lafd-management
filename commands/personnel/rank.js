@@ -247,8 +247,8 @@ async function changeRank(interaction, target, type) {
 
 async function showHistory(interaction) {
   const user = interaction.options.getUser('member');
-  const entries = db.getHistory(user.id, 100, ['HIRE', 'PROMOTION', 'DEMOTION', 'TERMINATION']);
-  const icon = { HIRE: ICONS.BADGE, PROMOTION: ICONS.PROMOTION, DEMOTION: ICONS.DEMOTION, TERMINATION: ICONS.DENY };
+  const entries = db.getHistory(user.id, 100, ['HIRE', 'PROMOTION', 'DEMOTION', 'TERMINATION', 'RESIGNATION']);
+  const icon = { HIRE: ICONS.BADGE, PROMOTION: ICONS.PROMOTION, DEMOTION: ICONS.DEMOTION, TERMINATION: ICONS.DENY, RESIGNATION: '👋' };
   const lines = entries.map(
     (h) =>
       `${icon[h.action_type]} **${h.action_type.charAt(0) + h.action_type.slice(1).toLowerCase()}** — ${h.old_value ? `${h.old_value} → ` : ''}${h.new_value || 'Removed'}\n` +

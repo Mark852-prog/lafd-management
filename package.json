@@ -1,6 +1,6 @@
 {
   "name": "lafd-management",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "LAFD Management - Discord bot for the Los Angeles Fire Department ER:LC roleplay department",
   "main": "index.js",
   "type": "commonjs",

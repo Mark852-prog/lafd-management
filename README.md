@@ -33,6 +33,7 @@ Run `/help` in Discord to see only the commands *you* can use. Levels: **M** Mem
 | `/cert grant` / `revoke` | CS | Certifications, with optional linked roles |
 | `/cert view` / `holders` | M | A member's certifications / everyone holding one |
 | `/commend` | CO | Public commendation (Lifesaving Award, Medal of Valor, …) |
+| `/resign submit` / `withdraw` / `status` | M | Hand in a resignation → Accept/Decline buttons for SS. Accepting removes all department roles and marks the member Resigned (re-hire with `/rank hire`) |
 
 ### Operations
 | Command | Level | What it does |
@@ -72,6 +73,10 @@ Severe actions are carried out automatically after confirmation:
 | `/config view` / `check` | DH | All settings / diagnostics (missing roles, role order, channel permissions) |
 | `/config channel` / `role` / `rank` / `clear` | DH | Link features to your channels and roles — no restart needed |
 | `/config autosetup` | DH | **Creates any missing channels and roles** and links them |
+| `/embed create` / `edit` | DH or Admin | In-Discord embed builder with live preview: title/text/footer/colour, fields, top & bottom images, link buttons, hidden-reply buttons, select menu |
+| `/embed post` / `image` / `rename` / `list` / `delete` | DH or Admin | Post anywhere, upload your own images (saved on the bot's disk), manage saved embeds |
+
+**Embed builder notes:** `/embed` is hidden from everyone without Administrator (server owners can grant it to roles in Server Settings → Integrations). Every posted copy is remembered and updated automatically when you edit the embed; deleted messages are forgotten. Buttons and menus keep working after restarts. Uploaded images live in `database/embed-images/` — keep that folder when updating the bot.
 
 > Server **Administrators** and the server owner can always use `/config`, so a brand-new server can be set up before any rank is linked.
 

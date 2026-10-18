@@ -40,8 +40,8 @@ function loadCommands(dir) {
         continue;
       }
       client.commands.set(command.data.name, command);
-      if (command.componentPrefix && command.handleComponent) {
-        client.componentHandlers.set(command.componentPrefix, command);
+      if (command.handleComponent) {
+        for (const prefix of [].concat(command.componentPrefix || [])) client.componentHandlers.set(prefix, command);
       }
     }
   }
