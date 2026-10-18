@@ -21,6 +21,7 @@ const CHANNEL_SETTINGS = {
   INCIDENT_REPORTS: { label: 'Incident Reports', env: 'CHANNEL_INCIDENT_REPORTS', autoCreate: 'incident-reports', visibility: 'public', category: 'board', description: 'Filed incident reports.' },
   CALLSIGN_REQUESTS: { label: 'Callsign Requests', env: 'CHANNEL_CALLSIGN_REQUESTS', autoCreate: 'callsign-requests', visibility: 'staff', category: 'staff', description: 'Callsign requests awaiting approval.' },
   LEAVE_REQUESTS: { label: 'Leave Requests', env: 'CHANNEL_LEAVE_REQUESTS', autoCreate: 'leave-requests', visibility: 'staff', category: 'staff', description: 'Leave of absence requests awaiting approval.' },
+  RESIGNATIONS: { label: 'Resignations', env: 'CHANNEL_RESIGNATIONS', autoCreate: 'resignations', visibility: 'staff', category: 'staff', fallback: 'LEAVE_REQUESTS', description: 'Resignation notices awaiting processing.' },
   LOG_DEFAULT: { label: 'Logs - Default', env: 'LOG_CHANNEL_DEFAULT', autoCreate: 'lafd-logs', visibility: 'staff', category: 'logs', description: 'Fallback for any log channel left unset.' },
   LOG_MANAGEMENT: { label: 'Logs - Management', env: 'LOG_CHANNEL_MANAGEMENT', autoCreate: 'management-logs', visibility: 'staff', category: 'logs', fallback: 'LOG_DEFAULT', description: 'Rank changes, announcements, config changes.' },
   LOG_DISCIPLINE: { label: 'Logs - Discipline', env: 'LOG_CHANNEL_DISCIPLINE', autoCreate: 'discipline-logs', visibility: 'staff', category: 'logs', fallback: 'LOG_DEFAULT', description: 'Infractions, removals, blacklist.' },

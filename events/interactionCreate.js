@@ -74,7 +74,7 @@ module.exports = {
       const handler = interaction.client.componentHandlers.get(prefix);
       if (!handler) return;
       try {
-        await handler.handleComponent(interaction, args);
+        await handler.handleComponent(interaction, args, prefix);
       } catch (err) {
         await reportFailure(interaction, `component ${interaction.customId}`, err);
       }

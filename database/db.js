@@ -195,6 +195,38 @@ db.exec(`
     created_at  TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS resignations (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    discord_id    TEXT NOT NULL,
+    reason        TEXT NOT NULL,
+    rank_name     TEXT,
+    last_day      TEXT,
+    status        TEXT NOT NULL DEFAULT 'PENDING',  -- PENDING | ACCEPTED | DECLINED | WITHDRAWN
+    created_at    TEXT NOT NULL,
+    decided_by    TEXT,
+    decided_at    TEXT,
+    decision_note TEXT,
+    channel_id    TEXT,
+    message_id    TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS custom_embeds (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    data        TEXT NOT NULL,                     -- JSON (see services/customEmbeds.js)
+    created_by  TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS custom_embed_posts (
+    embed_id    INTEGER NOT NULL REFERENCES custom_embeds(id) ON DELETE CASCADE,
+    channel_id  TEXT NOT NULL,
+    message_id  TEXT NOT NULL,
+    posted_at   TEXT NOT NULL,
+    PRIMARY KEY (embed_id, message_id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_shifts_member ON shifts (discord_id, start_time);
   CREATE INDEX IF NOT EXISTS idx_discipline_member ON discipline (discord_id);
   CREATE INDEX IF NOT EXISTS idx_history_member ON history (discord_id);
@@ -716,6 +748,72 @@ function countCommendations(discordId, sinceIso = null) {
 }
 
 // -------------------------------------------------------------------
+// Resignations
+// -------------------------------------------------------------------
+function createResignation({ discordId, reason, rankName, lastDay }) {
+  const info = db
+    .prepare(`INSERT INTO resignations (discord_id, reason, rank_name, last_day, status, created_at) VALUES (?, ?, ?, ?, 'PENDING', ?)`)
+    .run(discordId, reason, rankName, lastDay, now());
+  return getResignation(info.lastInsertRowid);
+}
+
+const getResignation = (id) => db.prepare('SELECT * FROM resignations WHERE id = ?').get(id);
+
+function updateResignation(id, fields) {
+  const keys = Object.keys(fields);
+  if (keys.length) db.prepare(`UPDATE resignations SET ${keys.map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`).run({ ...fields, id });
+  return getResignation(id);
+}
+
+function getPendingResignation(discordId) {
+  return db.prepare("SELECT * FROM resignations WHERE discord_id = ? AND status = 'PENDING' ORDER BY id DESC").get(discordId);
+}
+
+function getResignationHistory(discordId, limit = 5) {
+  return db.prepare('SELECT * FROM resignations WHERE discord_id = ? ORDER BY id DESC LIMIT ?').all(discordId, limit);
+}
+
+// -------------------------------------------------------------------
+// Custom embeds (/embed builder)
+// -------------------------------------------------------------------
+function parseCustomEmbed(row) {
+  return row ? { ...row, data: JSON.parse(row.data) } : null;
+}
+
+function createCustomEmbed(name, data, createdBy) {
+  const info = db
+    .prepare('INSERT INTO custom_embeds (name, data, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+    .run(name, JSON.stringify(data), createdBy, now(), now());
+  return getCustomEmbed(info.lastInsertRowid);
+}
+
+const getCustomEmbed = (id) => parseCustomEmbed(db.prepare('SELECT * FROM custom_embeds WHERE id = ?').get(id));
+const getCustomEmbedByName = (name) => parseCustomEmbed(db.prepare('SELECT * FROM custom_embeds WHERE name = ? COLLATE NOCASE').get(name));
+const getAllCustomEmbeds = () => db.prepare('SELECT * FROM custom_embeds ORDER BY name COLLATE NOCASE').all().map(parseCustomEmbed);
+
+function saveCustomEmbedData(id, data) {
+  db.prepare('UPDATE custom_embeds SET data = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(data), now(), id);
+  return getCustomEmbed(id);
+}
+
+function renameCustomEmbed(id, name) {
+  db.prepare('UPDATE custom_embeds SET name = ?, updated_at = ? WHERE id = ?').run(name, now(), id);
+  return getCustomEmbed(id);
+}
+
+function deleteCustomEmbed(id) {
+  db.prepare('DELETE FROM custom_embed_posts WHERE embed_id = ?').run(id);
+  return db.prepare('DELETE FROM custom_embeds WHERE id = ?').run(id).changes > 0;
+}
+
+function addCustomEmbedPost(embedId, channelId, messageId) {
+  db.prepare('INSERT OR IGNORE INTO custom_embed_posts (embed_id, channel_id, message_id, posted_at) VALUES (?, ?, ?, ?)').run(embedId, channelId, messageId, now());
+}
+
+const getCustomEmbedPosts = (embedId) => db.prepare('SELECT * FROM custom_embed_posts WHERE embed_id = ?').all(embedId);
+const removeCustomEmbedPost = (embedId, messageId) => db.prepare('DELETE FROM custom_embed_posts WHERE embed_id = ? AND message_id = ?').run(embedId, messageId);
+
+// -------------------------------------------------------------------
 // Stats
 // -------------------------------------------------------------------
 function getDatabaseStats() {
@@ -819,6 +917,23 @@ module.exports = {
   addCommendation,
   getCommendations,
   countCommendations,
+  // resignations
+  createResignation,
+  getResignation,
+  updateResignation,
+  getPendingResignation,
+  getResignationHistory,
+  // custom embeds
+  createCustomEmbed,
+  getCustomEmbed,
+  getCustomEmbedByName,
+  getAllCustomEmbeds,
+  saveCustomEmbedData,
+  renameCustomEmbed,
+  deleteCustomEmbed,
+  addCustomEmbedPost,
+  getCustomEmbedPosts,
+  removeCustomEmbedPost,
   // stats
   getDatabaseStats,
 };
